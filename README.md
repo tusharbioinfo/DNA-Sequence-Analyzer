@@ -87,7 +87,7 @@ dna-sequence-analyzer/
 
 ## 📄 Author
 
-- Tushar Sain
+  Tushar Sain
 - Bioinformatics | Genomics | Computational Biology
 
 Made for learning and exploring computational biology, one sequence at a time. 🧬
