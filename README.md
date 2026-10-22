@@ -85,10 +85,9 @@ dna-sequence-analyzer/
 - Improve handling and documentation of ambiguity codes in GC/AT calculations.
 - Add an offline-friendly version with local copies of third-party assets.
 
-## 📄 License
+## 📄 Author
 
-Unless another license is added by the repository owner, reuse terms are not explicitly granted. Add a license file if you want to specify how others may use, modify, and distribute this project.
-
----
+Tushar Sain
+Bioinformatics | Genomics | Computational Biology
 
 Made for learning and exploring computational biology, one sequence at a time. 🧬
