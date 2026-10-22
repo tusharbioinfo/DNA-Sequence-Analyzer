@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNA Sequence Analyzer</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base Nucleotide Colors */
+        .base-A { color: #16a34a; font-weight: 600; } /* Green */
+        .base-T { color: #dc2626; font-weight: 600; } /* Red */
+        .base-G { color: #d97706; font-weight: 600; } /* Amber */
+        .base-C { color: #2563eb; font-weight: 600; } /* Blue */
+        .base-U { color: #9333ea; font-weight: 600; } /* Purple */
+        .base-N { color: #64748b; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-dna text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight leading-none">DNA Sequence Analyzer</h1>
+                    <span class="text-xs text-slate-400">Bioinformatics Sequence Analyzer</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button onclick="loadSampleData()" class="text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg transition flex items-center gap-2">
+                    <i class="fa-solid fa-vial"></i> <span>Load Sample FASTA</span>
+                </button>
+                <button onclick="exportReportCSV()" id="exportBtn" class="hidden text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-csv"></i> <span>Export CSV</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Dashboard Container -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT PANEL: Sequence Input & Controls (4 Columns) -->
+            <div class="lg:col-span-4 space-y-5">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-code text-indigo-600"></i> Sequence Input
+                        </h2>
+                        <button onclick="clearWorkspace()" class="text-xs text-rose-600 hover:text-rose-700 font-medium">
+                            Clear All
+                        </button>
+                    </div>
+
+                    <!-- Drag & Drop Upload Box -->
+                    <div id="dropZone" onclick="document.getElementById('fileUpload').click()" 
+                         class="border-2 border-dashed border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/40 rounded-xl p-4 text-center cursor-pointer transition mb-4">
+                        <input type="file" id="fileUpload" accept=".fasta,.fa,.fna,.txt" class="hidden" onchange="handleFileSelect(event)">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-indigo-500 mb-1"></i>
+                        <p class="text-xs font-medium text-slate-600">Drop FASTA file here or <span class="text-indigo-600 underline">browse</span></p>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Supports single or multi-FASTA (.fa, .fasta, .txt)</p>
+                    </div>
+
+                    <!-- Textarea Input -->
+                    <label for="sequenceInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                        Raw Sequence / FASTA Format
+                    </label>
+                    <textarea id="sequenceInput" rows="10" 
+                        placeholder=">Seq_ID Description&#10;ATGCGATCGATCGATCGATCGATC&#10;GCTAGCTAGCTAGCTAAGCTTTTG..."
+                        class="w-full font-mono text-xs p-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none resize-y leading-relaxed"></textarea>
+
+                    <!-- Action Button -->
+                    <button onclick="processInput()" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-microscope"></i> Analyze DNA Sequence
+                    </button>
+                </div>
+
+                <!-- Multi-FASTA Record Selector (Hidden unless >1 record) -->
+                <div id="multiFastaCard" class="hidden bg-indigo-950 text-white rounded-2xl p-4 shadow-sm">
+                    <label for="recordSelector" class="block text-xs uppercase tracking-wider text-indigo-300 font-semibold mb-2">
+                        <i class="fa-solid fa-layer-group mr-1"></i> Multiple Sequences Detected
+                    </label>
+                    <select id="recordSelector" onchange="selectFastaRecord(this.value)" 
+                        class="w-full bg-indigo-900 border border-indigo-700 text-white text-sm rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    </select>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Analytics Dashboard (8 Columns) -->
+            <div class="lg:col-span-8 space-y-6">
+
+                <!-- Empty State Placeholder -->
+                <div id="emptyState" class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm flex flex-col items-center justify-center min-h-[420px]">
+                    <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-dna text-3xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">Ready for Sequence Analysis</h3>
+                    <p class="text-sm text-slate-500 max-w-md mt-1 mb-6">
+                        Paste a FASTA sequence on the left, upload a file, or load a sample gene segment to compute nucleotide distribution, GC profile, melting temperature, and reverse complement.
+                    </p>
+                    <button onclick="loadSampleData()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl shadow-sm transition">
+                        Try Sample Sequence (BRCA1 Exon)
+                    </button>
+                </div>
+
+                <!-- Active Results Container -->
+                <div id="resultsDashboard" class="hidden space-y-6">
+
+                    <!-- Sequence Header Banner -->
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">FASTA Header</span>
+                            <h2 id="headerTitle" class="font-mono text-sm sm:text-base font-semibold text-slate-800 mt-1.5 break-all"></h2>
+                        </div>
+                        <div class="flex gap-3 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+                            <div class="text-left sm:text-right">
+                                <span class="text-xs text-slate-400 block">Melting Temp (Tm)</span>
+                                <span id="metricTm" class="font-mono text-sm font-bold text-slate-700">0 °C</span>
+                            </div>
+                            <div class="border-l border-slate-200 pl-3 text-left sm:text-right">
+                                <span class="text-xs text-slate-400 block">ssDNA Mass</span>
+                                <span id="metricMass" class="font-mono text-sm font-bold text-slate-700">0 kDa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Primary KPI Cards -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <!-- Sequence Length -->
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-1">
+                                <span class="text-xs font-semibold uppercase">Length</span>
+                                <i class="fa-solid fa-ruler-horizontal text-indigo-500"></i>
+                            </div>
+                            <p id="kpiLength" class="font-mono text-2xl font-bold text-slate-800">0</p>
+                            <span class="text-xs text-slate-500">Base pairs (bp)</span>
+                        </div>
+
+                        <!-- GC Content -->
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-1">
+                                <span class="text-xs font-semibold uppercase">GC Content</span>
+                                <i class="fa-solid fa-percent text-emerald-500"></i>
+                            </div>
+                            <p id="kpiGC" class="font-mono text-2xl font-bold text-emerald-600">0%</p>
+                            <span id="kpiGCStatus" class="text-xs text-slate-500">G + C ratio</span>
+                        </div>
+
+                        <!-- AT Content -->
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-1">
+                                <span class="text-xs font-semibold uppercase">AT Content</span>
+                                <i class="fa-solid fa-chart-pie text-amber-500"></i>
+                            </div>
+                            <p id="kpiAT" class="font-mono text-2xl font-bold text-amber-600">0%</p>
+                            <span class="text-xs text-slate-500">A + T ratio</span>
+                        </div>
+
+                        <!-- G+C Count vs A+T Count -->
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-1">
+                                <span class="text-xs font-semibold uppercase">GC / AT Bases</span>
+                                <i class="fa-solid fa-scale-balanced text-sky-500"></i>
+                            </div>
+                            <p id="kpiBaseSplit" class="font-mono text-lg font-bold text-slate-800 mt-1">0 / 0</p>
+                            <span id="ambiguousBadge" class="text-xs text-slate-500">0 ambiguous</span>
+                        </div>
+                    </div>
+
+                    <!-- Nucleotide Breakdown Bar + Charts Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                        
+                        <!-- Nucleotide Counts & Doughnut Chart (5 cols) -->
+                        <div class="md:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800 mb-4">Nucleotide Count</h3>
+                                <div class="grid grid-cols-2 gap-2.5 mb-4">
+                                    <div class="p-2.5 rounded-xl bg-green-50 border border-green-200 flex justify-between items-center">
+                                        <div>
+                                            <span class="text-xs font-bold text-green-700 block">Adenine (A)</span>
+                                            <span id="pctA" class="text-[11px] text-green-600 font-mono">0%</span>
+                                        </div>
+                                        <span id="countA" class="font-mono text-lg font-bold text-slate-800">0</span>
+                                    </div>
+                                    <div class="p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex justify-between items-center">
+                                        <div>
+                                            <span class="text-xs font-bold text-rose-700 block">Thymine (T)</span>
+                                            <span id="pctT" class="text-[11px] text-rose-600 font-mono">0%</span>
+                                        </div>
+                                        <span id="countT" class="font-mono text-lg font-bold text-slate-800">0</span>
+                                    </div>
+                                    <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex justify-between items-center">
+                                        <div>
+                                            <span class="text-xs font-bold text-amber-700 block">Guanine (G)</span>
+                                            <span id="pctG" class="text-[11px] text-amber-600 font-mono">0%</span>
+                                        </div>
+                                        <span id="countG" class="font-mono text-lg font-bold text-slate-800">0</span>
+                                    </div>
+                                    <div class="p-2.5 rounded-xl bg-blue-50 border border-blue-200 flex justify-between items-center">
+                                        <div>
+                                            <span class="text-xs font-bold text-blue-700 block">Cytosine (C)</span>
+                                            <span id="pctC" class="text-[11px] text-blue-600 font-mono">0%</span>
+                                        </div>
+                                        <span id="countC" class="font-mono text-lg font-bold text-slate-800">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="relative h-44 w-full flex items-center justify-center">
+                                <canvas id="baseDoughnutChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Sliding Window GC Profile Trace (7 cols) -->
+                        <div class="md:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-800">Regional GC% Distribution</h3>
+                                    <p id="windowInfo" class="text-xs text-slate-400">Sliding window trace across sequence</p>
+                                </div>
+                                <span class="text-xs font-mono bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-200">5' → 3' Trace</span>
+                            </div>
+                            <div class="relative h-64 w-full mt-2">
+                                <canvas id="gcLineChart"></canvas>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Interactive Sequence Workbench (Tabs) -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="border-b border-slate-200 bg-slate-50 px-5 pt-3 flex flex-wrap items-center justify-between gap-2">
+                            <!-- Tab Buttons -->
+                            <div class="flex space-x-1">
+                                <button onclick="switchTab('revcomp')" id="tab-revcomp" class="tab-btn px-4 py-2 text-xs font-semibold rounded-t-lg bg-white text-indigo-600 border-t border-l border-r border-slate-200 -mb-px">
+                                    Reverse Complement (5'→3')
+                                </button>
+                                <button onclick="switchTab('genbank')" id="tab-genbank" class="tab-btn px-4 py-2 text-xs font-semibold rounded-t-lg text-slate-600 hover:text-slate-800">
+                                    Color-Coded Sequence
+                                </button>
+                                <button onclick="switchTab('rna')" id="tab-rna" class="tab-btn px-4 py-2 text-xs font-semibold rounded-t-lg text-slate-600 hover:text-slate-800">
+                                    mRNA Transcript
+                                </button>
+                            </div>
+
+                            <!-- Copy & Download Actions -->
+                            <div class="flex items-center space-x-2 pb-2">
+                                <button onclick="copyActiveSequence()" class="text-xs bg-white hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300 transition flex items-center gap-1.5">
+                                    <i class="fa-regular fa-copy"></i> Copy
+                                </button>
+                                <button onclick="downloadRevCompFasta()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-200 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-download"></i> .FASTA
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab Content Area -->
+                        <div class="p-5">
+                            <!-- View 1: Reverse Complement -->
+                            <div id="view-revcomp" class="tab-view">
+                                <div id="revCompOutput" class="font-mono text-xs sm:text-sm bg-slate-50 p-4 rounded-xl border border-slate-200 break-all max-h-60 overflow-y-auto leading-relaxed select-all text-slate-800"></div>
+                            </div>
+
+                            <!-- View 2: Color-Coded Indexed View -->
+                            <div id="view-genbank" class="tab-view hidden">
+                                <div id="genbankOutput" class="font-mono text-xs bg-slate-50 p-4 rounded-xl border border-slate-200 max-h-60 overflow-y-auto leading-6 whitespace-pre"></div>
+                            </div>
+
+                            <!-- View 3: mRNA View -->
+                            <div id="view-rna" class="tab-view hidden">
+                                <div id="rnaOutput" class="font-mono text-xs sm:text-sm bg-slate-50 p-4 rounded-xl border border-slate-200 break-all max-h-60 overflow-y-auto leading-relaxed select-all text-purple-900"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 z-50 bg-slate-900 text-white text-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-2.5">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMessage">Action completed</span>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // Global state
+        let parsedRecords = [];
+        let currentAnalysis = null;
+        let activeTab = 'revcomp';
+        let doughnutChartInstance = null;
+        let lineChartInstance = null;
+
+        // Full IUPAC DNA Complement Lookup Table
+        const IUPAC_COMPLEMENT = {
+            'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G', 'U': 'A',
+            'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W', 'K': 'M',
+            'M': 'K', 'B': 'V', 'V': 'B', 'D': 'H', 'H': 'D', 'N': 'N'
+        };
+
+        // Toast Helper
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            document.getElementById('toastMessage').innerText = message;
+            icon.className = isError 
+                ? 'fa-solid fa-circle-exclamation text-rose-400' 
+                : 'fa-solid fa-circle-check text-emerald-400';
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 2800);
+        }
+
+        // Parse Single or Multi-FASTA Text
+        function parseFastaText(rawText) {
+            const lines = rawText.trim().split(/\r?\n/);
+            const records = [];
+            let currentHeader = null;
+            let currentSeq = [];
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line || line.startsWith(';')) continue;
+                if (line.startsWith('>')) {
+                    if (currentHeader !== null || currentSeq.length > 0) {
+                        records.push({
+                            header: currentHeader || 'Unnamed Sequence',
+                            seq: currentSeq.join('')
+                        });
+                    }
+                    currentHeader = line.substring(1).trim() || 'Unnamed Sequence';
+                    currentSeq = [];
+                } else {
+                    // Clean digits, spaces, dashes (in case pasted from GenBank)
+                    const cleanedLine = line.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                    currentSeq.push(cleanedLine);
+                }
+            }
+
+            if (currentHeader !== null || currentSeq.length > 0) {
+                records.push({
+                    header: currentHeader || 'Raw DNA Sequence (No FASTA Header)',
+                    seq: currentSeq.join('')
+                });
+            }
+
+            return records.filter(r => r.seq.length > 0);
+        }
+
+        // Process User Input
+        function processInput() {
+            const rawInput = document.getElementById('sequenceInput').value.trim();
+            if (!rawInput) {
+                showToast('Please paste a DNA sequence or upload a FASTA file.', true);
+                return;
+            }
+
+            parsedRecords = parseFastaText(rawInput);
+
+            if (parsedRecords.length === 0) {
+                showToast('No valid nucleotide characters found in input!', true);
+                return;
+            }
+
+            // Handle Multi-FASTA Dropdown UI
+            const multiCard = document.getElementById('multiFastaCard');
+            const selector = document.getElementById('recordSelector');
+
+            if (parsedRecords.length > 1) {
+                selector.innerHTML = parsedRecords.map((rec, idx) => 
+                    `<option value="${idx}">${idx + 1}. ${rec.header.substring(0, 45)} (${rec.seq.length} bp)</option>`
+                ).join('');
+                multiCard.classList.remove('hidden');
+            } else {
+                multiCard.classList.add('hidden');
+            }
+
+            analyzeRecord(0);
+        }
+
+        function selectFastaRecord(index) {
+            analyzeRecord(parseInt(index, 10));
+        }
+
+        // Core Bioinformatics Calculation Engine
+        function analyzeRecord(index) {
+            const record = parsedRecords[index];
+            const seq = record.seq;
+            const len = seq.length;
+
+            let counts = { A: 0, T: 0, G: 0, C: 0, other: 0 };
+            let revCompArr = new Array(len);
+
+            // Single-pass loop for speed even on large sequences
+            for (let i = 0; i < len; i++) {
+                const base = seq[i];
+                if (base === 'A') counts.A++;
+                else if (base === 'T' || base === 'U') counts.T++;
+                else if (base === 'G') counts.G++;
+                else if (base === 'C') counts.C++;
+                else counts.other++;
+
+                // Reverse complement mapping in single pass
+                revCompArr[len - 1 - i] = IUPAC_COMPLEMENT[base] || 'N';
+            }
+
+            const revComp = revCompArr.join('');
+            const rnaSeq = seq.replace(/T/g, 'U');
+
+            const gcCount = counts.G + counts.C;
+            const atCount = counts.A + counts.T;
+            const gcPct = (gcCount / len) * 100;
+            const atPct = (atCount / len) * 100;
+
+            // Melting Temperature (Tm) Calculation
+            let tm = 0;
+            if (len < 14) {
+                tm = (2 * atCount) + (4 * gcCount);
+            } else {
+                tm = 64.9 + 41 * ((gcCount - 16.4) / len);
+            }
+
+            // Approximate ssDNA Molecular Weight in kDa
+            const molWeightDa = (counts.A * 313.21) + (counts.T * 304.20) + (counts.C * 289.18) + (counts.G * 329.21) - 61.96;
+            const molWeightKda = Math.max(0, molWeightDa / 1000);
+
+            currentAnalysis = {
+                header: record.header,
+                seq,
+                revComp,
+                rnaSeq,
+                len,
+                counts,
+                gcCount,
+                atCount,
+                gcPct,
+                atPct,
+                tm,
+                molWeightKda
+            };
+
+            updateUI(currentAnalysis);
+        }
+
+        // Render Results to Dashboard
+        function updateUI(data) {
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('resultsDashboard').classList.remove('hidden');
+            document.getElementById('exportBtn').classList.remove('hidden');
+
+            document.getElementById('headerTitle').innerText = data.header;
+            document.getElementById('metricTm').innerText = `${data.tm.toFixed(1)} °C`;
+            document.getElementById('metricMass').innerText = `${data.molWeightKda.toFixed(2)} kDa`;
+
+            document.getElementById('kpiLength').innerText = data.len.toLocaleString();
+            document.getElementById('kpiGC').innerText = `${data.gcPct.toFixed(2)}%`;
+            document.getElementById('kpiAT').innerText = `${data.atPct.toFixed(2)}%`;
+            document.getElementById('kpiBaseSplit').innerText = `${data.gcCount.toLocaleString()} / ${data.atCount.toLocaleString()}`;
+            document.getElementById('ambiguousBadge').innerText = data.counts.other > 0 
+                ? `${data.counts.other} IUPAC/N bases` 
+                : '100% standard ATGC';
+
+            // Nucleotide cards
+            ['A', 'T', 'G', 'C'].forEach(base => {
+                const c = data.counts[base];
+                const p = ((c / data.len) * 100).toFixed(2);
+                document.getElementById(`count${base}`).innerText = c.toLocaleString();
+                document.getElementById(`pct${base}`).innerText = `${p}%`;
+            });
+
+            // Sequence Workbench Outputs
+            document.getElementById('revCompOutput').innerText = data.revComp;
+            document.getElementById('rnaOutput').innerText = data.rnaSeq;
+            document.getElementById('genbankOutput').innerHTML = formatGenBankHTML(data.seq);
+
+            // Render Charts
+            renderDoughnutChart(data.counts);
+            renderGCProfileChart(data.seq);
+        }
+
+        // Format Color-Coded Numbered Sequence (Capped at 6,000 bp for smooth DOM performance)
+        function formatGenBankHTML(seq) {
+            const limit = Math.min(seq.length, 6000);
+            let lines = [];
+            for (let i = 0; i < limit; i += 60) {
+                const posNum = String(i + 1).padStart(6, ' ');
+                let blocks = [];
+                for (let j = i; j < Math.min(i + 60, limit); j += 10) {
+                    const chunk = seq.slice(j, Math.min(j + 10, limit));
+                    const coloredChunk = chunk.split('').map(b => {
+                        const cls = 'ATGCU'.includes(b) ? `base-${b}` : 'base-N';
+                        return `<span class="${cls}">${b}</span>`;
+                    }).join('');
+                    blocks.push(coloredChunk);
+                }
+                lines.push(`<span class="text-slate-400 select-none">${posNum}</span>  ${blocks.join(' ')}`);
+            }
+            if (seq.length > limit) {
+                lines.push(`\n<span class="text-amber-600">... [Showing first 6,000 of ${seq.length.toLocaleString()} bp for fast rendering]</span>`);
+            }
+            return lines.join('\n');
+        }
+
+        // Render Nucleotide Doughnut Chart
+        function renderDoughnutChart(counts) {
+            const ctx = document.getElementById('baseDoughnutChart').getContext('2d');
+            if (doughnutChartInstance) doughnutChartInstance.destroy();
+
+            doughnutChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Adenine (A)', 'Thymine (T)', 'Guanine (G)', 'Cytosine (C)'],
+                    datasets: [{
+                        data: [counts.A, counts.T, counts.G, counts.C],
+                        backgroundColor: ['#22c55e', '#f43f5e', '#f59e0b', '#3b82f6'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Render Regional GC% Sliding Window Chart
+        function renderGCProfileChart(seq) {
+            const ctx = document.getElementById('gcLineChart').getContext('2d');
+            if (lineChartInstance) lineChartInstance.destroy();
+
+            const len = seq.length;
+            const windowSize = Math.max(5, Math.min(100, Math.floor(len / 12) || len));
+            const step = Math.max(1, Math.floor(windowSize / 2));
+
+            const labels = [];
+            const dataPoints = [];
+
+            if (len <= 10) {
+                for (let i = 0; i < len; i++) {
+                    labels.push(`${i + 1}`);
+                    dataPoints.push((seq[i] === 'G' || seq[i] === 'C') ? 100 : 0);
+                }
+            } else {
+                for (let i = 0; i <= len - windowSize; i += step) {
+                    const sub = seq.slice(i, i + windowSize);
+                    let gc = 0;
+                    for (let c of sub) if (c === 'G' || c === 'C') gc++;
+                    labels.push(`${i + 1}`);
+                    dataPoints.push(((gc / windowSize) * 100).toFixed(1));
+                }
+            }
+
+            document.getElementById('windowInfo').innerText = `Window size: ${windowSize} bp | Step: ${step} bp`;
+
+            lineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Regional GC %',
+                        data: dataPoints,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: dataPoints.length > 40 ? 0 : 2.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: { callback: val => val + '%' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Sequence Position (bp)', font: { size: 11 } },
+                            ticks: { maxTicksLimit: 8 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Workbench Tab Switcher
+        function switchTab(tabName) {
+            activeTab = tabName;
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = 'tab-btn px-4 py-2 text-xs font-semibold rounded-t-lg text-slate-600 hover:text-slate-800';
+            });
+            document.getElementById(`tab-${tabName}`).className = 
+                'tab-btn px-4 py-2 text-xs font-semibold rounded-t-lg bg-white text-indigo-600 border-t border-l border-r border-slate-200 -mb-px';
+        }
+
+        // Copy Active Output to Clipboard
+        function copyActiveSequence() {
+            if (!currentAnalysis) return;
+            let textToCopy = currentAnalysis.revComp;
+            if (activeTab === 'genbank') textToCopy = currentAnalysis.seq;
+            if (activeTab === 'rna') textToCopy = currentAnalysis.rnaSeq;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast('Sequence copied to clipboard!');
+            });
+        }
+
+        // Download Reverse Complement as FASTA
+        function downloadRevCompFasta() {
+            if (!currentAnalysis) return;
+            const wrapped = currentAnalysis.revComp.match(/.{1,70}/g).join('\n');
+            const content = `>RevComp_${currentAnalysis.header}\n${wrapped}\n`;
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'reverse_complement.fasta';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Downloaded reverse_complement.fasta');
+        }
+
+        // Export Full Metrics Report as CSV
+        function exportReportCSV() {
+            if (!currentAnalysis) return;
+            const d = currentAnalysis;
+            const rows = [
+                ['Header', 'Length (bp)', 'GC Content (%)', 'AT Content (%)', 'Adenine (A)', 'Thymine (T)', 'Guanine (G)', 'Cytosine (C)', 'Melting Temp (C)', 'Mass (kDa)', 'Reverse Complement'],
+                [`"${d.header.replace(/"/g, '""')}"`, d.len, d.gcPct.toFixed(2), d.atPct.toFixed(2), d.counts.A, d.counts.T, d.counts.G, d.counts.C, d.tm.toFixed(1), d.molWeightKda.toFixed(2), d.revComp]
+            ];
+            const csvContent = rows.map(r => r.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dna_analysis_report.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV Analysis Report exported!');
+        }
+
+        // Sample Data Loader (Multi-FASTA demonstration)
+        function loadSampleData() {
+            document.getElementById('sequenceInput').value = 
+`>NM_007294.4 Homo sapiens BRCA1 DNA repair associated (Exon segment)
+ATGGATTTATCTGCTCTTCGCGTTGAAGAAGTACAAAATGTCATTAATGCTATGCAGAAA
+ATCTTAGAGTGTCCCATCTGTCTGGAGTTGATCAAGGAACCTGTCTCCACAAAGTGTGAC
+CACATATTTTGCAAATTTTGCATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAG
+TGTCCTTTATGTAAGAATGATATAACCAAAAGGAGCCTACAAGAAAGTACGAGATTTAGT
+CAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAG
+
+>NC_045512.2 SARS-CoV-2 Spike Glycoprotein partial coding region
+ATGTTTGTTTTTCTTGTTTTATTGCCACTAGTCTCTAGTCAGTGTGTTAATCTTACAACC
+AGAACTCAATTACCCCCTGCATACACTAATTCTTTCACACGTGGTGTTTATTACCCTGAC
+AAAGTTTTCAGATCCTCAGTTTTACATTCAACTCAGGACTTGTTCTTACCTTTCTTTTCC`;
+            processInput();
+            showToast('Sample Multi-FASTA loaded!');
+        }
+
+        // Clear Workspace
+        function clearWorkspace() {
+            document.getElementById('sequenceInput').value = '';
+            document.getElementById('fileUpload').value = '';
+            document.getElementById('resultsDashboard').classList.add('hidden');
+            document.getElementById('multiFastaCard').classList.add('hidden');
+            document.getElementById('exportBtn').classList.add('hidden');
+            document.getElementById('emptyState').classList.remove('hidden');
+            currentAnalysis = null;
+        }
+
+        // File Upload & Drag-and-Drop Handlers
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            readUploadedFile(file);
+        }
+
+        function readUploadedFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('sequenceInput').value = e.target.result;
+                processInput();
+                showToast(`Loaded file: ${file.name}`);
+            };
+            reader.readAsText(file);
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+            if (e.dataTransfer.files.length) {
+                readUploadedFile(e.dataTransfer.files[0]);
+            }
+        });
+    </script>
+</body>
+</html>

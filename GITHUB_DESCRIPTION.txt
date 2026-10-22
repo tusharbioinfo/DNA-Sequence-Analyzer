@@ -1,0 +1,1 @@
+Browser-based DNA sequence analyzer with FASTA upload, GC/AT statistics, interactive charts, reverse complement, and CSV export.
